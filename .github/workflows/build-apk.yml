@@ -4,27 +4,55 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_COMPILE_SDK: "33"
+      ANDROID_BUILD_TOOLS: "33.0.2"
+      ANDROID_SDK_TOOLS: "9477386"
+
     steps:
-      - uses: actions/checkout@v4
-      - name: 设置JDK 17
+      - name: 检出代码（Node.js 24兼容版）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装Node.js 24（强制指定版本）
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+
+      - name: 安装安卓SDK依赖（解决编译核心错误）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+          # 下载安卓SDK
+          wget https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS}_latest.zip -O sdk-tools.zip
+          unzip -q sdk-tools.zip -d $ANDROID_HOME
+          # 安装必需组件
+          yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --licenses
+          $ANDROID_HOME/cmdline-tools/bin/sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}"
+
+      - name: 设置JDK 17（Node.js 24兼容版）
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
-      - name: 授予权限
+          check-latest: true
+
+      - name: 授予Gradle执行权限
         run: chmod +x ./gradlew
-      - name: 编译APK
-        run: ./gradlew clean assembleRelease --stacktrace
-      - name: 上传APK
+
+      - name: 清理并编译APK
+        run: |
+          ./gradlew clean
+          ./gradlew assembleRelease --stacktrace --no-daemon
+
+      - name: 上传编译好的APK
         uses: actions/upload-artifact@v4
         with:
-          name: CarMusicFix_S3
+          name: CarMusicFix_S3_Android13
           path: app/build/outputs/apk/release/*.apk
           retention-days: 30
