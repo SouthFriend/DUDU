@@ -4,44 +4,57 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.view.KeyEvent
-import com.dudu.car.CarKeyEvent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 
-// 嘟嘟梁山S3 音乐返回BUG核心修复服务
+// 通用安卓13版 - 嘟嘟梁山S3音乐返回BUG修复服务
 class CarMusicFixService : Service() {
     // 需要修复的音乐APP包名（网易云+QQ音乐）
     private val targetApps = arrayOf(
         "com.netease.cloudmusic",  // 网易云音乐
         "com.tencent.qqmusic"      // QQ音乐
     )
+    
+    // 车机按键监听广播
+    private lateinit var keyReceiver: BroadcastReceiver
 
     override fun onCreate() {
         super.onCreate()
         // 启动任务栈锁定
         TaskLockUtils.startLock(this, targetApps)
+        // 注册安卓通用按键监听（替换嘟嘟专属SDK）
+        registerKeyReceiver()
+    }
+
+    // 注册安卓通用的按键监听（适配360全景/返回键）
+    private fun registerKeyReceiver() {
+        keyReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                val keyCode = intent?.getIntExtra("keyCode", 0) ?: 0
+                val action = intent?.getIntExtra("action", 0) ?: 0
+                
+                // 拦截返回键/主页键（360全景返回后触发的异常按键）
+                if (action == KeyEvent.ACTION_UP && 
+                    (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_HOME)) {
+                    TaskLockUtils.lockTargetTask(context!!)
+                }
+            }
+        }
+        
+        val filter = IntentFilter()
+        filter.addAction("android.intent.action.MEDIA_BUTTON")
+        filter.addAction("android.intent.action.ACTION_CLOSE_SYSTEM_DIALOGS")
+        registerReceiver(keyReceiver, filter)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // 监听车机360全景切换、按键事件
-        registerCarKeyListener()
-        return START_STICKY // 服务被杀死后自动重启
+        return START_STICKY // 服务被杀死后自动重启（适配车机内存回收）
     }
 
-    // 监听嘟嘟梁山车机专属按键/360全景事件
-    private fun registerCarKeyListener() {
-        CarKeyEvent.setOnKeyListener { keyCode, event ->
-            if (event.action == KeyEvent.ACTION_UP) {
-                when (keyCode) {
-                    // 拦截转向/360全景返回后的异常返回键
-                    KeyEvent.KEYCODE_BACK,
-                    KeyEvent.KEYCODE_HOME -> {
-                        // 仅锁定音乐APP，不拦截正常操作
-                        TaskLockUtils.lockTargetTask(this)
-                        true
-                    }
-                }
-            }
-            false
-        }
+    override fun onDestroy() {
+        super.onDestroy()
+        unregisterReceiver(keyReceiver) // 注销广播，避免内存泄漏
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
