@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.car.music.fix">
+
+    <!-- 车机必备权限 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.GET_TASKS" />
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- 安卓13 后台权限 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="音乐修复"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.NoDisplay"> <!-- 无UI -->
+
+        <!-- 开机自启广播 -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <!-- 嘟嘟梁山车机专属开机广播 -->
+                <action android:name="com.dudu.car.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 核心修复服务 -->
+        <service
+            android:name=".CarMusicFixService"
+            android:exported="false"
+            android:process=":remote" />
+
+    </application>
+
+</manifest>
